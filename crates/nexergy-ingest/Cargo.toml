@@ -1,0 +1,20 @@
+[package]
+name = "nexergy-ingest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+polars = { workspace = true }
+reqwest = { workspace = true }
+rayon = { workspace = true }
+regex = { workspace = true }
+walkdir = { workspace = true }
+
+[dependencies.nexergy-core]
+path = "../nexergy-core"
