@@ -1,0 +1,12 @@
+[package]
+name = "nexergy-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+walkdir = { workspace = true }
+
+[dependencies.nexergy-ingest]
+path = "../nexergy-ingest"

@@ -1,0 +1,229 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Lint (fmt)
+        run: cargo fmt --all -- --check
+
+      - name: Lint (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::cognitive_complexity
+
+      # - name: Install cargo-nextest
+      #   run: cargo install cargo-nextest --locked
+
+      # - name: Install llvm-tools and cargo-llvm-cov
+      #   run: |
+      #     rustup component add llvm-tools-preview
+      #     cargo install cargo-llvm-cov --locked
+
+      # - name: Clean coverage artifacts
+      #   run: cargo llvm-cov clean --workspace
+
+      # - name: Run coverage tests (nextest, no report)
+      #   run: cargo llvm-cov nextest --workspace --all-features --no-report
+
+      # - name: Generate code coverage (lcov)
+      #   run: cargo llvm-cov report --lcov --output-path lcov.info
+
+      # - name: Generate code coverage (html)
+      #   run: cargo llvm-cov report --html
+
+      # - name: Enforce coverage threshold
+      #   run: cargo llvm-cov report --fail-under-lines 56
+
+      # - name: Upload coverage artifacts
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: coverage
+      #     path: |
+      #       lcov.info
+      #       target/llvm-cov/html
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release, all features)
+        run: cargo build --workspace --all-features --release
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            target/release
+
+  deps:
+    name: Dependency Hygiene
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-outdated
+        run: cargo install cargo-outdated --locked
+
+      - name: Check outdated dependencies (non-fatal)
+        run: cargo outdated --workspace --exit-code 0
+
+  security:
+    name: Security and Supply Chain
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-deny, cargo-geiger, cargo-supply-chain
+        run: |
+          cargo install cargo-deny --locked
+
+      - name: Run cargo-deny (config)
+        run: cargo deny check
+
+  docs:
+    name: Docs Quality
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build documentation (treat warnings as errors)
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  budgets:
+    name: Budgets
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify budget script exists
+        run: test -f scripts/check-budgets.sh
+
+      - name: Run budget checks (default budgets)
+        run: bash scripts/check-budgets.sh
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit --deny warnings
+
+  release:
+    name: Release
+    runs-on: ubuntu-24.04
+    needs:
+      - test
+      - build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: build/
+
+      - name: Create archive
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          REPO=${GITHUB_REPOSITORY##*/}
+          mkdir -p dist
+          tar -C build -czf dist/${REPO}-${VERSION}-linux-x64.tar.gz .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+
+  # webui-lint:
+  #   name: Web UI Linters
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
+
+  #     - name: Lint HTML/CSS/JS (webui)
+  #       uses: super-linter/super-linter@v8.1.0
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         FILTER_REGEX_INCLUDE: ^webui/.*
+  #         VALIDATE_JAVASCRIPT_ES: true
+  #         VALIDATE_CSS: true
+  #         VALIDATE_HTML: true
+
