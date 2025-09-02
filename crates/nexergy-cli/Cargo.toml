@@ -8,5 +8,8 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 walkdir = { workspace = true }
 
+[dependencies.nexergy-model]
+path = "../nexergy-model"
+
 [dependencies.nexergy-ingest]
 path = "../nexergy-ingest"

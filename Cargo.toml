@@ -3,6 +3,7 @@ members = [
     "crates/nexergy-core",
     "crates/nexergy-ingest",
     "crates/nexergy-cli",
+    "crates/nexergy-model",
 ]
 resolver = "2"
 
