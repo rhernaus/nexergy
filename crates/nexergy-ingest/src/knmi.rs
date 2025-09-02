@@ -65,10 +65,15 @@ fn normalize_date_str(df: &DataFrame) -> Result<(DataFrame, String)> {
     let mut candidate: Option<String> = None;
     for name in df.get_column_names() {
         let s = df.column(name)?;
-        if s.len() == 0 {
+        if s.is_empty() {
             continue;
         }
-        let v = s.str_value(0)?;
+        let av = s.get(0)?;
+        let v = match av {
+            AnyValue::String(v) => v,
+            AnyValue::StringOwned(ref v) => v.as_str(),
+            _ => "",
+        };
         let t = v.trim();
         if t.len() >= 8 && t.chars().take(8).all(|c| c.is_ascii_digit()) {
             candidate = Some(name.to_string());
@@ -85,7 +90,12 @@ fn normalize_date_str(df: &DataFrame) -> Result<(DataFrame, String)> {
     let s = df.column(&date_col)?;
     let mut out: Vec<String> = Vec::with_capacity(df.height());
     for idx in 0..df.height() {
-        let v = s.str_value(idx)?;
+        let av = s.get(idx)?;
+        let v = match av {
+            AnyValue::String(v) => v,
+            AnyValue::StringOwned(ref v) => v.as_str(),
+            _ => "",
+        };
         let t = v.trim();
         if t.len() >= 8 && t.chars().take(8).all(|c| c.is_ascii_digit()) {
             out.push(format!("{}-{}-{}", &t[0..4], &t[4..6], &t[6..8]));
@@ -96,7 +106,7 @@ fn normalize_date_str(df: &DataFrame) -> Result<(DataFrame, String)> {
     let date_series = Series::new("date_str".into(), out);
 
     let mut df2 = df.clone();
-    df2.hstack_mut(&[date_series])?;
+    df2.hstack_mut(&[date_series.into()])?;
     Ok((df2, "date_str".to_string()))
 }
 
@@ -119,9 +129,16 @@ pub fn write_partitioned_by_date<P: AsRef<Path>>(
     let s = df2.column(&date_col_norm)?;
     let mut by_date: std::collections::BTreeMap<String, Vec<usize>> = Default::default();
     for idx in 0..df2.height() {
-        let v = s.str_value(idx)?;
-        let date = &v[0..10];
-        by_date.entry(date.to_string()).or_default().push(idx);
+        let av = s.get(idx)?;
+        let v = match av {
+            AnyValue::String(v) => v,
+            AnyValue::StringOwned(ref v) => v.as_str(),
+            _ => continue,
+        };
+        if v.len() >= 10 {
+            let date = &v[0..10];
+            by_date.entry(date.to_string()).or_default().push(idx);
+        }
     }
 
     for (date, indices) in by_date.into_iter() {

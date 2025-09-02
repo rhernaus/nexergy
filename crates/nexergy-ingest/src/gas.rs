@@ -41,9 +41,16 @@ pub fn write_partitioned_by_date<P: AsRef<Path>>(df: &DataFrame, out_dir: P) -> 
     let s = df.column("datetime_local")?;
     let mut by_date: std::collections::BTreeMap<String, Vec<usize>> = Default::default();
     for idx in 0..df.height() {
-        let v = s.str_value(idx)?;
-        let date = &v[0..10];
-        by_date.entry(date.to_string()).or_default().push(idx);
+        let av = s.get(idx)?;
+        let val = match av {
+            AnyValue::String(v) => v,
+            AnyValue::StringOwned(ref v) => v.as_str(),
+            _ => continue,
+        };
+        if val.len() >= 10 {
+            let date = &val[0..10];
+            by_date.entry(date.to_string()).or_default().push(idx);
+        }
     }
 
     for (date, indices) in by_date.into_iter() {
