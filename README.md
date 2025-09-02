@@ -33,6 +33,14 @@ cargo build
 ```
 
 - KNMI daily (daggegevens) → Parquet
+- ENTSO-E TimeSeries (XML) → Parquet
+```bash
+./target/debug/nexergy-cli ingest-entsoe \
+  --base_url "https://transparency.entsoe.eu/api" \
+  --security_token "$ENTSOE_TOKEN" \
+  --params "documentType=A44" "processType=A01" "outBiddingZone_Domain=10YNL----------L" "periodStart=202401010000" "periodEnd=202401012300" \
+  --out-dir data/curated/entsoe
+```
 ```bash
 ./target/debug/nexergy-cli ingest-knmi-daily \
   --start 20240101 --end 20240107 \

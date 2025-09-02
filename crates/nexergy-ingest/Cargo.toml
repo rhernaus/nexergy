@@ -15,6 +15,7 @@ reqwest = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 walkdir = { workspace = true }
+quick-xml = { workspace = true }
 
 [dependencies.nexergy-core]
 path = "../nexergy-core"

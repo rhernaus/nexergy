@@ -51,6 +51,17 @@ enum Commands {
         #[arg(long, name = "out-dir")]
         out_dir: PathBuf,
     },
+    #[command(name = "ingest-entsoe")]
+    Entsoe {
+        #[arg(long)]
+        base_url: String,
+        #[arg(long)]
+        security_token: String,
+        #[arg(long)]
+        params: Vec<String>,
+        #[arg(long, name = "out-dir")]
+        out_dir: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -83,6 +94,24 @@ fn main() -> Result<()> {
         } => {
             let df = nexergy_ingest::knmi::fetch_knmi_daily_to_df(&start, &end, &stns, &vars)?;
             nexergy_ingest::knmi::write_partitioned_by_date(&df, "YYYYMMDD", &out_dir)?;
+        }
+        Commands::Entsoe {
+            base_url,
+            security_token,
+            params,
+            out_dir,
+        } => {
+            // Parse key=value pairs
+            let mut q: std::collections::HashMap<&str, String> = std::collections::HashMap::new();
+            q.insert("securityToken", security_token);
+            for kv in params {
+                if let Some((k, v)) = kv.split_once('=') {
+                    q.insert(Box::leak(k.to_string().into_boxed_str()), v.to_string());
+                }
+            }
+            let xml = nexergy_ingest::entsoe::fetch_xml_to_string(&base_url, &q)?;
+            let df = nexergy_ingest::entsoe::parse_timeseries_xml(&xml)?;
+            nexergy_ingest::entsoe::write_partitioned_by_start_date(&df, &out_dir)?;
         }
     }
     Ok(())
